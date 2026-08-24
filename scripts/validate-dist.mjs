@@ -23,6 +23,10 @@ const SCREENSHOTS = [
   "assets/screenshots/screenshot-1.png",
   "assets/screenshots/screenshot-2.png",
 ];
+const README_IMAGES = [
+  "assets/readme/active-project.png",
+  "assets/readme/status-signals.png",
+];
 
 function expectedMuxy() {
   return {
@@ -118,6 +122,16 @@ async function validateListingAssets(base, declared = null) {
       `${screenshot} must be exactly 1600×1000`,
     );
     declared?.add(screenshot);
+  }
+  for (const image of README_IMAGES) {
+    const path = resolve(base, image);
+    assert.ok(inside(base, path), `${image} escapes package`);
+    assert.deepEqual(
+      { width: pngInfo(await readFile(path)).width, height: pngInfo(await readFile(path)).height },
+      { width: 760, height: 475 },
+      `${image} must be exactly 760×475`,
+    );
+    declared?.add(image);
   }
 }
 
