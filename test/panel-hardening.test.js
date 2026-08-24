@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ControlTowerApp } from "../src/panel/app.js";
+import { ControlTowerApp, countLabel } from "../src/panel/app.js";
 import { initialState } from "../src/core/reducer.js";
 
 function bareApp() {
@@ -10,6 +10,13 @@ function bareApp() {
   app.maybeAutoFocusActiveProject = () => {};
   return app;
 }
+
+test("header counts use singular and plural labels", () => {
+  assert.equal(countLabel(1, "signal"), "1 signal");
+  assert.equal(countLabel(2, "signal"), "2 signals");
+  assert.equal(countLabel(1, "workstream"), "1 workstream");
+  assert.equal(countLabel(0, "workstream"), "0 workstreams");
+});
 
 test("refresh requests coalesce into one follow-up while a refresh is in flight", async () => {
   const app = bareApp();

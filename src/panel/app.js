@@ -35,6 +35,10 @@ export function stateColor(controlState) {
   return `var(--st-${controlState}, var(--st-idle))`;
 }
 
+export function countLabel(count, singular, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 export class ControlTowerApp {
   constructor(root) {
     this.root = root;
@@ -624,7 +628,9 @@ export class ControlTowerApp {
           title: `${signalCount} of ${rows.length} workstreams have status signals`,
         },
           signalCount > 0 ? icon("info", 12) : icon("check", 12),
-          signalCount > 0 ? `${signalCount} signals` : `${rows.length} workstreams`,
+          signalCount > 0
+            ? countLabel(signalCount, "signal")
+            : countLabel(rows.length, "workstream"),
         ),
         h("span", { class: "ct-spacer" }),
         this.refreshing
