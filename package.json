@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Muxy panel for GSD project progress, recorded next steps, and agent activity.",
+  "description": "Read-only Muxy panel for GSD next steps, roadmap progress, and agent activity.",
   "engines": {
     "node": ">=20"
   },
@@ -20,7 +20,7 @@
   },
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
-    "description": "See what every GSD workstream is doing, which agent needs you, and where to go next — without leaving Muxy.",
+    "description": "Read GSD next steps, roadmap progress, and live agent activity across Muxy projects.",
     "background": "background.js",
     "permissions": [
       "projects:read",
