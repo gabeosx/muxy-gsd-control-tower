@@ -156,8 +156,8 @@ export async function validateReleaseGovernance() {
   assert.deepEqual(workflows, ["ci.yml"], "one bounded CI workflow is allowed");
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.equal([...workflow.matchAll(/^\s*permissions:/gm)].length, 1, "job-level permissions are forbidden");
-  assert.match(workflow, /actions\/checkout@11bd71901bbe5b1630ceea73d27597364c9af683\s+# v4/);
-  assert.match(workflow, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\s+# v4/);
+  assert.match(workflow, /actions\/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09\s+# v5/);
+  assert.match(workflow, /actions\/setup-node@a0853c24544627f65ddf259abe73b1d18a591444\s+# v5/);
   for (const command of ["npm ci", "npm test", "npm run validate"]) assert.ok(workflow.includes(command), `CI must run ${command}`);
   assert.doesNotMatch(workflow, /secrets\.|permissions:\s*write|npm publish|\bdeploy\b/i, "CI must not receive secrets or publication authority");
   return Object.freeze({ version: manifest.version });
