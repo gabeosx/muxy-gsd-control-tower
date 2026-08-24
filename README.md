@@ -2,90 +2,65 @@
 
 > See what every GSD workstream is doing, which agent needs you, and where to go next — without leaving Muxy.
 
-GSD Control Tower is a **read-first** [Muxy](https://muxy.app/docs/extensions/overview) extension that combines project planning state from
-[GSD](https://github.com/open-gsd/gsd-core) artifacts (`.planning/`) with live AI-agent activity reported by **Muxy itself**.
-Planning state comes from your files and works with any GSD workflow. The live agent overlay, however, only sees agents that
-**run inside Muxy** (Claude Code, Codex, Droid, Grok, OpenCode, Pi, Cursor, Kiro, Antigravity, Xal panes) — Muxy reports their
-lifecycle via provider hooks. Agents running in an external terminal (a plain Codex CLI, Claude Code in Terminal.app, harness
-processes) are invisible to Muxy's `agents` APIs and are never invented by this panel.
+GSD Control Tower brings [GSD](https://github.com/open-gsd/gsd-core) project progress, next steps, and agent activity into one [Muxy](https://muxy.app/docs/extensions/overview) panel. It opens on your current project and gives you a cross-project view when you need it.
+
+Planning status comes from each project's `.planning/` files. Agent status is available for sessions running inside Muxy.
 
 ## What it tells you
 
-- The panel **opens inside the project you're currently in** (Preferences → Open on active project), showing its milestone progress,
-  next action, and a **phase pipeline**: every phase with its rollup status (Complete / In progress / Underway / Queued) and
-  **stage chips for what has happened within it** — discuss · research · ui spec · patterns · plan · execute n/m · verify ✓/✗ · review · security · validation. Click a phase for its goal and details.
-- Which **Muxy-hosted** agent is **working, waiting for you**, or idle — per worktree, from Muxy's agent APIs. The Agent activity block
-  says so explicitly when empty: external-terminal agents (Codex CLI outside Muxy, DeepSeek Harness, Terminal.app sessions) don't report through Muxy.
-- What looks **blocked**, **stale** (no observed change within your threshold), or **ready** (an explicit next action recorded in your artifacts).
-- **Blockers vs concerns:** notes under `Blockers/Concerns` are shown as *concerns* and never block on their own; a workstream only reads
-  Blocked when STATE.md's own status says blocked or a phase verification failed. Future-tense notes ("needs a Windows machine later") stay visible without hijacking the attention queue.
-- A ranked **attention queue** so the thing that needs you is always at the top.
-- **Non-GSD projects stay out of the list by default** (Preferences → Show non-GSD projects). They still reach *Needs attention* when an agent reports waiting/working — runtime attention is provider business, not GSD business.
+- Milestone progress, the current phase, and the next recorded action.
+- A phase-by-phase view of the GSD artifacts each project actually uses.
+- Factual signals for waiting agents, failed verification, unavailable planning data, and stale structured work.
+- Agent activity reported by Muxy for each worktree.
+- Branch, recent commit, and working-tree context.
 
-## Surfaces
+## How status signals work
 
-| Surface | Purpose |
-| --- | --- |
-| **Control Tower panel** (right dock) | Attention queue, all workstreams, per-workstream detail, search + filters, diagnostics, preferences |
-| **Status bar item** | Attention count with icon swap; click toggles the panel |
-| **Background script** | Session-scoped event hub that updates a hydrated status-bar baseline while the panel is hidden |
-
-Palette commands (`⌘⇧G` toggles the panel): toggle panel · refresh all · toggle diagnostics · reveal top attention item.
-
-## Control states
-
-Priority order: `waiting > blocked > unknown > stale > ready > working > idle`.
+The **Status signals** list contains workstreams with one or more explicit signals. Rows sort by project and worktree name, and every applicable signal remains visible.
 
 | State | Meaning |
 | --- | --- |
-| Waiting | Muxy reports an agent waiting for attention (never inferred from silence) |
-| Blocked | GSD artifacts explicitly say blocked, or a phase verification failed — never from concern notes |
-| Unknown | `.planning/` exists but required artifacts are missing/unreadable/inconsistent |
-| Stale | Work still open, nobody driving, no observed change within your threshold |
-| Ready | Artifacts record a clear next action and no agent is active |
-| Working | Muxy reports an agent actively working |
-| Idle | Recognized GSD state with nothing demanding attention |
+| Waiting for you | An agent session in Muxy reports that it is waiting |
+| Verification failed | The current phase has a failed verification result |
+| Planning unavailable | Required GSD planning data could not be read |
+| Stale | Open work has not changed within your chosen threshold |
+| Next action | Structured GSD artifacts provide a next action and no agent is active |
+| Working | An agent session in Muxy is working |
+| No signal | None of the defined status signals is present |
 
-Derived states (`blocked`, `stale`, `ready`) always show their reason and evidence. Runtime states come only from Muxy.
+Raw GSD status text is shown in project details but never affects a signal. Waiting and Working come from Muxy agent events. Verification failure comes from a typed verification result. Completion and open work come from phase checklists and counts. Paused comes from handoff fields, Stale uses dated activity, and Next action requires a value derived from structured artifacts.
+
+Discussion, research, UI, patterns, review, security, and validation artifacts are optional. Control Tower shows only the artifacts a phase actually contains; a missing optional artifact is never treated as incomplete work.
 
 ## Permissions & privacy
 
-Read-first MVP. No command execution, no file writes, no Git writes, no terminal reading, no transcripts, no notifications, no network,
-no telemetry — nothing leaves your machine.
+The extension reads GSD planning files and Git status. It does not execute commands, change project files or Git state, read terminal output, send notifications, or make network requests.
 
-The extension reads only recognized relative paths under `.planning/` through Muxy's brokered file API. Diagnostics are bounded and stay in Muxy-managed extension storage. They contain capability results, artifact-relative paths, and error messages; they do not intentionally capture file bodies, terminal output, transcripts, credentials, or telemetry. Screenshots and release bundles are scanned for private paths and credential patterns before submission.
+Preferences and recent diagnostics are stored in Muxy's extension storage. Diagnostics may include relative planning paths and error messages, but not planning-file contents, terminal output, transcripts, or credentials.
 
 | Permission | Why |
 | --- | --- |
 | `projects:read` / `worktrees:read` | List the projects and worktrees you already added to Muxy |
-| `agents:read` | `agents.list()` hydration + `agent.status` events |
-| `files:read` | Read recognized `.planning/` artifacts only |
-| `git:read` | Branch, last-commit date (staleness evidence), dirty-file count |
-| `storage:read/write` | Your filters, thresholds, included-project choices, bounded diagnostics |
-| `panels:write` | Panel open/toggle + status-bar updates |
-| `projects:write` + `worktrees:write` | **Only** for the explicit "Open context" action (switches Muxy's active project/worktree) |
+| `agents:read` | Show agent activity reported by Muxy |
+| `files:read` | Read GSD files under `.planning/` |
+| `git:read` | Show branch, recent commit, and changed-file count |
+| `storage:read/write` | Remember your preferences and recent diagnostics |
+| `panels:write` | Open the panel and update its status-bar item |
+| `projects:write` + `worktrees:write` | Open a selected project or worktree in Muxy |
 
-## Honest limitations
+## Limitations
 
-- **Planning state is read per project's active worktree.** Muxy sandboxes file reads to each project's active worktree root, so other
-  worktrees of the same project show live agent/git overlay plus an explicit note instead of fabricated planning state.
-- **Cross-project freshness is event-driven where Muxy allows it.** `file.changed` covers the active project/worktree; other projects
-  refresh on panel open, manual refresh, and project/worktree changes. Rows show their last refresh.
-- **Provider capabilities differ.** Providers whose CLIs expose no "waiting" hook (Pi, Cursor, Kiro, Antigravity, Xal) are labeled as such;
-  the extension never treats silence as waiting.
-- **Agent activity is Muxy-scoped.** `agent.status` / `agents.list()` only cover agents hosted in Muxy panes. Work done by agents in
-  external terminals — including Codex CLI outside Muxy or any harness-driven process — never appears in the Agent activity block or in
-  Waiting/Working states; GSD artifact state (phases, plans, verification, staleness) is unaffected.
-- Agent state is a **worktree-level aggregate** (Muxy semantics), not a per-process inventory.
-- **Lifecycle scope is session-local.** After Muxy restarts, the background indicator remains neutral until the panel publishes a fresh inventory snapshot. It does not persist derived attention that may be stale.
-- **SSH workspaces are not qualified for 0.1.0.** Local projects are the supported deployment shape. Native remote qualification is tracked in [OPEN_ISSUES.md](OPEN_ISSUES.md).
+- Planning status is read from each project's active worktree. Other worktrees still show agent and Git activity.
+- Changes outside the current project refresh while the panel is open. The interval is configurable in Preferences (5 minutes by default; Manual, 1, 5, 15, or 30 minutes).
+- Agent sessions running outside Muxy are not shown.
+- After restarting Muxy, open Control Tower once to refresh the status-bar count.
+- Remote workspaces are not supported in 0.1.0.
 
 ## Requirements
 
 - [Muxy](https://muxy.app/) on macOS. Version 0.1.0 was tested with Muxy 1.5.0 (945).
-- Projects tracked with [GSD](https://github.com/open-gsd/gsd-core) — i.e. a `.planning/` directory. Non-GSD projects are hidden from
-  the list by default and only surface runtime attention.
-- Live agent states additionally require agents hosted in Muxy panes (see limitations below).
+- Projects tracked with [GSD](https://github.com/open-gsd/gsd-core) — i.e. a `.planning/` directory. Non-GSD projects are hidden by default and can be shown in Preferences.
+- Live agent status requires the agent session to run inside Muxy.
 
 ## Installation
 
@@ -103,25 +78,24 @@ Then in Muxy: Extensions modal → **Load Unpacked** pointing at this folder's `
 
 ## Troubleshooting
 
-- **Panel shows "permission denied"** — open Diagnostics (⌘⇧G → info icon); each capability shows whether it worked or was denied.
+- **Panel shows "permission denied"** — open Diagnostics (⌘⇧G → info icon); each permission shows whether it worked or was denied.
   Re-grant the listed permission (e.g. `files:read`) when Muxy prompts, then hit refresh.
-- **A project shows "Planning state unreadable"** — the Diagnostics error log names the exact artifact; the parsers are tolerant, but a
+- **A project shows "Planning data unavailable"** — the Diagnostics error log names the exact file; a
   truncated `.planning/STATE.md` will surface there.
-- **Agent activity is empty** — that block only reflects agents running inside Muxy panes. External terminal sessions never report
-  through Muxy; this is expected, not a bug.
-- **Stale everywhere** — staleness is honest: incomplete work with no observed change inside your threshold (default 45 min).
+- **Agent activity is empty** — only agent sessions running inside Muxy appear in Control Tower.
+- **Stale everywhere** — Stale means structured open work has not changed inside your threshold (default 45 minutes).
   Raise it in Preferences if you work in long quiet stretches.
-- **A project is marked project-scoped** — Muxy denied or could not provide its worktree inventory. Diagnostics names the affected API result; the extension does not present the fallback row as a confirmed worktree.
+- **Project details are unavailable** — refresh the panel and check Diagnostics for a permission or project-loading error.
 
 ## Uninstalling
 
-Disable or uninstall GSD Control Tower from Muxy's Extensions screen. This removes the panel, commands, status item, event subscriptions, and Muxy-managed extension preferences. The extension never writes project files, Git state, commands, notifications, or external services, so there is no project-side cleanup.
+Disable or uninstall GSD Control Tower from Muxy's Extensions screen. The extension does not change project files or Git state, so there is no project-side cleanup.
 
 ## Development
 
 ```bash
 npm install
-npm test          # node:test suite over parsers, precedence, reducer, selectors, prefs, navigation
+npm test          # node:test suite over parsers, status derivation, reducer, selectors, prefs, navigation
 npm run build     # vite build → dist/ (+ manifest copy + structural/schema validation)
 npm run validate  # frozen manifest/assets, import graph, secrets, audit, deterministic clean copies
 ```
@@ -140,19 +114,17 @@ src/panel/app.js          UI controller + views (list/detail/diagnostics/setting
 src/background/main.js    event hub → status bar
 src/core/                 pure domain: types, frontmatter, GSD parsers, status derivation, reducer, selectors, navigation
 src/host/                 window.muxy bridge wrappers (feature-detecting) + storage-backed prefs
-test/fixtures/            committed GSD artifact shapes (active, complete-with-blockers, broken)
+test/fixtures/            committed GSD artifact shapes (active, complete, malformed)
 scripts/                  copy-manifest.mjs, validate-dist.mjs (permission policy + JSON-Schema check)
 ```
 
 ### Parser contract
 
-Versioned tolerant adapters (`gsd-parser/1.0`) support `gsd_state_version: 1.0` and captured classic plus milestone-era GSD shapes: `STATE.md` frontmatter + Current Position +
-Blockers-vs-Concerns classification (bullets block only when status explicitly says blocked) + freshest-timestamp activity,
+The parser supports `gsd_state_version: 1.0` and captured classic plus milestone-era GSD layouts: `STATE.md` frontmatter + Current Position +
+Blockers/Concerns notes + dated activity,
 `ROADMAP.md` checklist/details (integer and decimal phases), per-phase directories with a full stage pipeline
-(discuss/research/ui/patterns → plan/execute queues → verification/review/security/validation), `PROJECT.md`, `config.json`,
+(optional discuss/research/ui/patterns artifacts, plan/execute counts, and optional verification/review/security/validation artifacts), `PROJECT.md`, `config.json`,
 `HANDOFF.json`, `.continue-here.md` (root or phase dir), current-phase `VERIFICATION.md`, milestone-era layouts (`MILESTONES.md`,
-`.planning/milestones/vX.Y-*`). Unknown headings/files are tolerated; every displayed claim cites its source path; problems surface
-as warnings/errors on the snapshot — never fabricated progress, and completion is never inferred from agent idleness.
-Evidence timestamps read from artifact content are marked dated; read-time stamps never feed staleness math.
+`.planning/milestones/vX.Y-*`). Status signals use typed agent and verification states, checklist/count data, handoff fields, parse availability, and dated activity. Raw status prose is display-only.
 
 Release policy and history: [RELEASING.md](RELEASING.md) · [CHANGELOG.md](CHANGELOG.md).

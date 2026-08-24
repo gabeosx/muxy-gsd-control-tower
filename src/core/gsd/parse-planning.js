@@ -205,7 +205,6 @@ export async function buildGsdSnapshot(source, opts = {}) {
     },
     lastActivity: state?.lastActivity,
     lastActivityDesc: state?.lastActivityDesc,
-    blockers: state?.blockers ?? [],
     concerns: state?.concerns ?? [],
     verification,
     verificationDetail,
@@ -279,8 +278,6 @@ function compareNumbers(a, b) {
 function deriveNextAction(ctx) {
   const { state, paused, pauseDetail, phaseQueue, roadmap, verification } = ctx;
   if (paused) return pauseDetail ? `Resume paused work (${pauseDetail})` : "Resume paused work (.continue-here)";
-  if (state?.frontmatterStatus === "complete" || /^(complete|done)\b/i.test(state?.statusLine ?? ""))
-    return "Milestone complete — plan the next milestone";
   if (verification === "failed")
     return "Address the failed verification before proceeding";
   if (phaseQueue && phaseQueue.plansTotal > phaseQueue.plansSummarized) {
@@ -288,7 +285,6 @@ function deriveNextAction(ctx) {
   }
   const open = nextOpenPhase(roadmap.phases);
   if (open) return `Start Phase ${open.number}: ${open.name}`;
-  if (state?.planLabel && /^not started/i.test(state.planLabel)) return "Start the queued plan";
   return undefined;
 }
 
@@ -296,7 +292,6 @@ function deriveNextAction(ctx) {
 function emptySnapshot(extra, now) {
   return {
     recognized: false,
-    blockers: [],
     concerns: [],
     verification: "unknown",
     paused: false,

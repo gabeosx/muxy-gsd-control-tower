@@ -12,7 +12,7 @@ test("every product JavaScript module is reachable from a shipped entrypoint", a
   const graph = await productionImportGraph();
   assert.ok(graph.includes("src/main.js"));
   assert.ok(graph.includes("src/background/main.js"));
-  assert.ok(graph.includes("src/background/attention-tracker.js"));
+  assert.ok(graph.includes("src/background/signal-tracker.js"));
   assert.deepEqual(await validateImportReachability(), graph);
 });
 

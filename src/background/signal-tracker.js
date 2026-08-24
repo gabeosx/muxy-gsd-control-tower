@@ -1,15 +1,15 @@
 const MAX_WAITING_IDS = 400;
 
 /**
- * Pure state machine for the background status-bar count.
+ * Pure state machine for the background status-signal count.
  *
  * A background restart intentionally begins neutral. Agent events received
- * before the panel's first snapshot are not enough to reconstruct GSD-derived
- * attention, so they are discarded when that authoritative baseline arrives.
+ * before the panel's first snapshot are not enough to reconstruct planning
+ * signals, so they are discarded when that authoritative baseline arrives.
  */
-export function createAttentionTracker() {
+export function createSignalTracker() {
   let hydrated = false;
-  let baseAttention = 0;
+  let baseSignalCount = 0;
   let baselineWaiting = new Set();
   let currentWaiting = new Set();
 
@@ -27,8 +27,8 @@ export function createAttentionTracker() {
 
     observeSnapshot(snapshot) {
       if (!snapshot || typeof snapshot !== "object") return false;
-      const attentionCount = Number(snapshot.attentionCount);
-      if (!Number.isFinite(attentionCount) || attentionCount < 0) return false;
+      const signalCount = Number(snapshot.signalCount);
+      if (!Number.isFinite(signalCount) || signalCount < 0) return false;
       const ids = Array.isArray(snapshot.waitingIds)
         ? snapshot.waitingIds
             .filter((value) => typeof value === "string" && value.trim())
@@ -36,14 +36,14 @@ export function createAttentionTracker() {
         : [];
       baselineWaiting = new Set(ids);
       currentWaiting = new Set(ids);
-      baseAttention = Math.floor(attentionCount);
+      baseSignalCount = Math.floor(signalCount);
       hydrated = true;
       return true;
     },
 
     count() {
       if (!hydrated) return 0;
-      return Math.max(0, baseAttention + currentWaiting.size - baselineWaiting.size);
+      return Math.max(0, baseSignalCount + currentWaiting.size - baselineWaiting.size);
     },
 
     isHydrated() {

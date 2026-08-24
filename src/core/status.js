@@ -1,11 +1,10 @@
 /**
  * Control-state derivation (PRD §3.4). Pure functions.
  *
- * Derivation follows the documented meaning of each state; ranking uses
- * CONTROL_PRIORITY. Derived states always carry an explicit, evidence-citing
- * reason; runtime states come only from Muxy agent data (never inferred).
+ * Derived states always carry an explicit, evidence-citing reason; runtime
+ * states come only from Muxy agent data (never inferred). Independent factual
+ * signals are preserved together so the UI presents all available evidence.
  */
-import { CONTROL_PRIORITY } from "./types.js";
 
 /**
  * @typedef {Object} StatusInput
@@ -20,7 +19,7 @@ import { CONTROL_PRIORITY } from "./types.js";
 /**
  * @param {StatusInput} ws
  * @param {{now?: number, staleThresholdMs?: number}} [opts]
- * @returns {{controlState: import("./types.js").ControlState, attentionReason?: string}}
+ * @returns {{controlState: import("./types.js").ControlState, statusReason?: string, signals: Array<{state:import("./types.js").ControlState, reason:string}>}}
  */
 export function deriveStatus(ws, opts = {}) {
   const now = opts.now ?? Date.now();
@@ -29,109 +28,110 @@ export function deriveStatus(ws, opts = {}) {
   const runtime = ws.agent?.runtimeState ?? "unavailable";
   const provider = ws.agent?.providerId;
 
-  // 1. Waiting — only from explicit runtime report (FR-024: never inferred).
+  const signals = deriveSignals(ws, { now, staleThresholdMs: thresholdMs });
+  const byState = (state) => signals.find((signal) => signal.state === state);
+
+  // The primary row state is only a compact visual label. Every applicable
+  // signal remains in `signals`, so this choice does not hide other evidence.
   if (runtime === "waiting") {
-    return {
-      controlState: "waiting",
-      attentionReason: `${provider ? label(provider) : "Agent"} reports it needs your attention`,
-    };
+    const signal = byState("waiting");
+    return { controlState: "waiting", statusReason: signal?.reason, signals };
   }
 
-  // 2. Blocked — explicit GSD evidence only. `gsd.blockers` is populated by the
-  // parser solely when STATE.md's own status text says blocked; notes in the
-  // "Blockers/Concerns" section surface as concerns and never block (verified
-  // on real projects where that section holds deferred, future-tense notes).
-  if (gsd?.recognized) {
-    const blockerBits = [];
-    if (gsd.blockers.length) blockerBits.push(`STATE.md records a blocker: “${gsd.blockers[0]}”`);
-    if (gsd.verification === "failed")
-      blockerBits.push(`phase verification failed${gsd.phaseLabel ? ` (${gsd.phaseLabel})` : ""}`);
-    if (blockerBits.length) {
-      return { controlState: "blocked", attentionReason: capitalize(blockerBits.join("; ")) };
-    }
-  }
-
-  // 3. Unknown — recognized GSD project whose required artifacts are absent/inconsistent.
-  if (gsd?.recognized && gsd.errors.length) {
-    return { controlState: "unknown", attentionReason: `Planning state unreadable — ${gsd.errors[0]}` };
-  }
-
-  const incomplete = isIncomplete(gsd);
-
-  // 4. Stale — incomplete work, no active agent, no recent observable change.
-  if (incomplete && runtime !== "working") {
-    const lastChangeMs = latestChangeMs(gsd, ws.git);
-    if (lastChangeMs != null && now - lastChangeMs > thresholdMs) {
-      const age = formatAge(now - lastChangeMs);
-      return {
-        controlState: "stale",
-        attentionReason: `No observed change for ${age}; work is still open`,
-      };
-    }
-  }
-
-  // 5. Ready — clear, explicitly recorded next action and nobody driving.
-  // A project whose artifacts say executing/planning/discussing is mid-flight,
-  // not waiting on the user — "ready" would be noise there.
-  if (gsd?.recognized && gsd.nextAction && runtime !== "working" && !isComplete(gsd) && !workflowActive(gsd)) {
-    return {
-      controlState: "ready",
-      attentionReason: `Next action: ${gsd.nextAction}`,
-    };
-  }
-
-  // 6. Working — active agent effort.
   if (runtime === "working") {
     return {
       controlState: "working",
-      attentionReason: provider ? `${label(provider)} is actively working` : undefined,
+      statusReason: provider ? `${label(provider)} is actively working` : undefined,
+      signals,
     };
   }
 
-  // 7. Idle — recognized, nothing demanding attention.
-  if (gsd?.recognized) return { controlState: "idle", attentionReason: undefined };
+  for (const state of ["blocked", "unknown", "stale"]) {
+    const signal = byState(state);
+    if (signal) return { controlState: state, statusReason: signal.reason, signals };
+  }
 
-  // Not a GSD project (or planning unreadable without recognition) — neutral row.
-  return { controlState: "idle", attentionReason: undefined };
+  if (gsd?.recognized && gsd.nextAction && !isComplete(gsd)) {
+    return {
+      controlState: "ready",
+      statusReason: `Next action: ${gsd.nextAction}`,
+      signals,
+    };
+  }
+
+  return { controlState: "idle", statusReason: undefined, signals };
 }
 
-/** Ranking comparator per PRD §3.4, ties broken by most recent activity then name. */
-export function compareAttention(a, b) {
-  const pa = CONTROL_PRIORITY[a.controlState];
-  const pb = CONTROL_PRIORITY[b.controlState];
-  if (pa !== pb) return pa - pb;
-  const ta = Date.parse(a.gsd?.lastActivity ?? a.refreshedAt ?? 0) || 0;
-  const tb = Date.parse(b.gsd?.lastActivity ?? b.refreshedAt ?? 0) || 0;
-  if (ta !== tb) return tb - ta;
-  return String(a.projectName).localeCompare(String(b.projectName));
+/** Derive every factual status signal independently from typed evidence. */
+export function deriveSignals(ws, opts = {}) {
+  const now = opts.now ?? Date.now();
+  const thresholdMs = opts.staleThresholdMs ?? 45 * 60_000;
+  const gsd = ws.gsd;
+  const runtime = ws.agent?.runtimeState ?? "unavailable";
+  const provider = ws.agent?.providerId;
+  const signals = [];
+
+  if (runtime === "waiting") {
+    signals.push({
+      state: "waiting",
+      reason: `${provider ? label(provider) : "Agent"} reports it is waiting for you`,
+    });
+  }
+
+  if (gsd?.recognized && gsd.verification === "failed") {
+    signals.push({
+      state: "blocked",
+      reason: `Phase verification failed${gsd.phaseLabel ? ` (${gsd.phaseLabel})` : ""}`,
+    });
+  }
+
+  if (gsd?.recognized && gsd.errors.length) {
+    signals.push({ state: "unknown", reason: "Planning data unavailable" });
+  }
+
+  const open = hasOpenWork(gsd);
+  if (open && runtime !== "working") {
+    const lastChangeMs = latestChangeMs(gsd, ws.git);
+    if (lastChangeMs != null && now - lastChangeMs > thresholdMs) {
+      const age = formatAge(now - lastChangeMs);
+      signals.push({ state: "stale", reason: `No updates for ${age}; structured work remains open` });
+    }
+  }
+  return signals;
 }
 
 /**
- * True when artifacts explicitly claim completion.
- * Deliberately NOT driven by progress percent or counts: some GSD variants
- * render a decorative 100% bar regardless of position (verified on real
- * projects), so completion requires an explicit status claim.
+ * True when structured checklist or phase-count data proves completion.
+ * Raw status text and decorative percentages are display-only.
  */
 export function isComplete(gsd) {
   if (!gsd?.recognized) return false;
-  if (/^(complete|done)$/i.test(String(gsd.frontmatterStatus ?? "").trim())) return true;
-  if (/^complete\b/i.test(String(gsd.statusLine ?? "").trim())) return true;
+  const roadmap = gsd.roadmapPhases;
+  if (Array.isArray(roadmap) && roadmap.length > 0 && roadmap.every((phase) => phase.done === true)) {
+    return true;
+  }
+  const total = finiteCount(gsd.progress?.totalPhases);
+  const completed = finiteCount(gsd.progress?.completedPhases);
+  if (total != null && total > 0 && completed != null && completed >= total) return true;
   return false;
 }
 
-function isIncomplete(gsd) {
-  return !!gsd?.recognized && !isComplete(gsd);
+/** True when structured artifacts prove there is unfinished work. */
+export function hasOpenWork(gsd) {
+  if (!gsd?.recognized || isComplete(gsd)) return false;
+  if (gsd.paused === true || gsd.verification === "pending") return true;
+  if (gsd.phaseQueue?.plansTotal > gsd.phaseQueue?.plansSummarized) return true;
+  if (Array.isArray(gsd.roadmapPhases) && gsd.roadmapPhases.some((phase) => phase.done === false)) {
+    return true;
+  }
+  const total = finiteCount(gsd.progress?.totalPhases);
+  const completed = finiteCount(gsd.progress?.completedPhases);
+  if (total != null && total > 0 && completed != null && completed < total) return true;
+  return !!gsd.nextAction;
 }
 
-/**
- * True when the artifacts themselves describe work in flight (executing,
- * planning, discussing, …). Distinct from agent runtime state: this is the
- * workflow's own claim about its position.
- */
-export function workflowActive(gsd) {
-  const s = `${gsd?.frontmatterStatus ?? ""} ${gsd?.statusLine ?? ""}`;
-  if (!s.trim()) return false;
-  return /\b(executing|implementing|discussing|planning|researching|specing|reviewing|verifying)\b/i.test(s);
+function finiteCount(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 /** Newest trustworthy change timestamp across artifact + git evidence. */
@@ -150,9 +150,9 @@ export function latestChangeMs(gsd, git) {
 
 export function formatAge(ms) {
   const min = Math.max(1, Math.round(ms / 60_000));
-  if (min < 60) return `${min} min`;
-  const hours = Math.floor(min / 60);
-  if (hours < 36) return `${hours} h ${min % 60 ? `${min % 60} m ` : ""}`.trim();
+  if (min < 60) return `${min} minute${min === 1 ? "" : "s"}`;
+  const hours = Math.round(min / 60);
+  if (hours < 36) return `${hours} hour${hours === 1 ? "" : "s"}`;
   const days = Math.round(hours / 24);
   return `${days} day${days === 1 ? "" : "s"}`;
 }
@@ -160,8 +160,4 @@ export function formatAge(ms) {
 export function label(providerId) {
   if (!providerId) return "Agent";
   return providerId.charAt(0).toUpperCase() + providerId.slice(1);
-}
-
-function capitalize(s) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }

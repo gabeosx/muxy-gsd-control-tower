@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  buildRows, attentionRows, statusCounts, filterRows, knownProviders, topAttention,
+  buildRows, signalRows, signalCounts, statusCounts, filterRows,
 } from "../src/core/selectors.js";
 import { initialState, applyInventory, applyWorkstreamData, applyAgentHydration } from "../src/core/reducer.js";
 
@@ -27,7 +27,7 @@ function makeStore() {
   state = applyWorkstreamData(state, "p-wait::root", {
     at: new Date(now).toISOString(),
     isGsd: true,
-    gsd: { recognized: true, blockers: [], verification: "unknown", paused: false, progress: { percent: 40 }, frontmatterStatus: "active", lastActivity: new Date(now - 60_000).toISOString(), evidence: [], errors: [] },
+    gsd: { recognized: true, verification: "unknown", paused: false, progress: { percent: 40 }, frontmatterStatus: "active", lastActivity: new Date(now - 60_000).toISOString(), evidence: [], errors: [] },
   });
   state = applyAgentHydration(state, [
     { projectID: "p-wait", providerID: "claude", status: "waiting" }, // root worktree (worktreeID absent)
@@ -36,13 +36,13 @@ function makeStore() {
   state = applyWorkstreamData(state, "p-blocked::root", {
     at: new Date(now).toISOString(),
     isGsd: true,
-    gsd: { recognized: true, blockers: ["Owner gate failed"], verification: "passed", paused: false, progress: { percent: 90 }, frontmatterStatus: "active", lastActivity: new Date(now - 120_000).toISOString(), evidence: [], errors: [] },
+    gsd: { recognized: true, verification: "failed", paused: false, progress: { percent: 90 }, frontmatterStatus: "active", lastActivity: new Date(now - 120_000).toISOString(), evidence: [], errors: [] },
   });
 
   state = applyWorkstreamData(state, "p-idle::root", {
     at: new Date(now).toISOString(),
     isGsd: true,
-    gsd: { recognized: true, blockers: [], verification: "passed", paused: false, progress: { percent: 100 }, frontmatterStatus: "complete", lastActivity: new Date(now - 3 * 60_000).toISOString(), evidence: [], errors: [] },
+    gsd: { recognized: true, verification: "passed", paused: false, progress: { totalPhases: 3, completedPhases: 3, percent: 100 }, frontmatterStatus: "complete", lastActivity: new Date(now - 3 * 60_000).toISOString(), evidence: [], errors: [] },
   });
 
   state = applyWorkstreamData(state, "p-nongsd::root", { at: new Date(now).toISOString(), isGsd: false });
@@ -50,16 +50,14 @@ function makeStore() {
   return state;
 }
 
-const PREFS = { staleThresholdMinutes: 45, showNonGsd: true, hiddenProjects: ["p-hidden"], filters: { query: "", statuses: [], providers: [] } };
+const PREFS = { staleThresholdMinutes: 45, refreshIntervalMinutes: 5, showNonGsd: true, hiddenProjects: ["p-hidden"], filters: { query: "", statuses: [] } };
 
-test("ranking follows PRD priority and attention set", () => {
+test("rows sort predictably by project name and expose factual signal rows", () => {
   const rows = buildRows(makeStore(), PREFS);
-  const order = rows.map((r) => r.controlState);
-  assert.equal(order[0], "waiting");
-  assert.equal(order[1], "blocked");
-  assert.ok(order.indexOf("idle") > order.indexOf("blocked"));
-  const att = attentionRows(rows);
-  assert.deepEqual(att.map((r) => r.projectName), ["zeta-waiting", "alpha-blocked"]);
+  assert.deepEqual(rows.map((row) => row.projectName), [
+    "alpha-blocked", "mid-idle-complete", "plain-project", "zeta-waiting",
+  ]);
+  assert.deepEqual(signalRows(rows).map((r) => r.projectName), ["alpha-blocked", "zeta-waiting"]);
 });
 
 test("hidden projects are excluded (FR-004)", () => {
@@ -74,21 +72,16 @@ test("counts aggregate by control state", () => {
   assert.equal(counts.idle, 2);
 });
 
-test("filters: query across names/paths/reasons; statuses; providers (FR-042)", () => {
+test("signal counts include every factual signal rather than only the row label", () => {
+  const rows = buildRows(makeStore(), PREFS);
+  const counts = signalCounts(rows);
+  assert.equal(counts.waiting, 1);
+  assert.equal(counts.blocked, 1);
+});
+
+test("filters: query across names/paths/reasons and factual statuses", () => {
   const rows = buildRows(makeStore(), PREFS);
   assert.equal(filterRows(rows, { query: "zeta" }).length, 1);
-  assert.equal(filterRows(rows, { query: "owner gate" }).length, 1);
+  assert.equal(filterRows(rows, { query: "verification" }).length, 1);
   assert.deepEqual(filterRows(rows, { statuses: ["blocked"] }).map((r) => r.projectName), ["alpha-blocked"]);
-  assert.equal(filterRows(rows, { providers: ["claude"] }).length, 1);
-  assert.equal(filterRows(rows, { providers: ["codex"] }).length, 0);
-});
-
-test("knownProviders lists distinct providers", () => {
-  assert.deepEqual(knownProviders(buildRows(makeStore(), PREFS)), ["claude"]);
-});
-
-test("topAttention returns the single highest-priority row", () => {
-  const top = topAttention(buildRows(makeStore(), PREFS));
-  assert.equal(top?.controlState, "waiting");
-  assert.equal(top?.projectName, "zeta-waiting");
 });

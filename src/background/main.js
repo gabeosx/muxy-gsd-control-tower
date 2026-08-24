@@ -2,13 +2,13 @@
  * GSD Control Tower — background host.
  *
  * The background script has no projects/worktrees/files/agents APIs, so the
- * open panel publishes a compact attention snapshot over the `extension.*`
+ * open panel publishes a compact status-signal snapshot over the `extension.*`
  * bus; between panel sessions this script tracks `agent.status` deltas and
  * keeps the status-bar figure honest without fabricating GSD-derived states.
  */
-import { createAttentionTracker } from "./attention-tracker.js";
+import { createSignalTracker } from "./signal-tracker.js";
 
-const tracker = createAttentionTracker();
+const tracker = createSignalTracker();
 
 function log(message) {
   try { console.log(`[control-tower] ${message}`); } catch { /* no-op */ }
@@ -21,13 +21,13 @@ async function renderStatusBar() {
   try {
     if (count > 0) {
       await muxyRef.statusbar.set({
-        id: "attention",
+        id: "signals",
         text: String(count),
-        icon: { symbol: "exclamationmark.triangle.fill" },
+        icon: { symbol: "circle.dashed" },
       });
     } else {
       await muxyRef.statusbar.set({
-        id: "attention",
+        id: "signals",
         text: "",
         icon: { symbol: "circle.dashed" },
       });

@@ -49,14 +49,13 @@ function expectedMuxy() {
       ],
     }],
     statusBarItems: [{
-      id: "attention", icon: { symbol: "circle.dashed" }, text: "",
-      tooltip: "GSD Control Tower — workstreams needing attention", side: "right", command: "toggle-tower",
+      id: "signals", icon: { symbol: "circle.dashed" }, text: "",
+      tooltip: "GSD Control Tower — workstreams with status signals", side: "right", command: "toggle-tower",
     }],
     commands: [
       { id: "toggle-tower", title: "Control Tower: Toggle Panel", defaultShortcut: "cmd+shift+g", action: { kind: "togglePanel", panel: "control-tower" } },
       { id: "refresh-tower", title: "Control Tower: Refresh All Workstreams" },
       { id: "toggle-diagnostics", title: "Control Tower: Toggle Diagnostics View" },
-      { id: "focus-top-attention", title: "Control Tower: Reveal Top Attention Item", subtitle: "Highlights the highest-priority workstream in the open panel" },
     ],
   };
 }

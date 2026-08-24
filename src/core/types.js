@@ -7,44 +7,19 @@
 /** @typedef {"waiting"|"blocked"|"working"|"ready"|"stale"|"idle"|"unknown"} ControlState */
 /** @typedef {"live"|"refreshed"|"stale"} Freshness */
 
-/** Priority order for ranking (PRD §3.4). Lower rank = higher attention. */
-export const CONTROL_PRIORITY = {
-  waiting: 0,
-  blocked: 1,
-  unknown: 2,
-  stale: 3,
-  ready: 4,
-  working: 5,
-  idle: 6,
-};
-
 /** Human labels for control states. */
 export const CONTROL_LABELS = {
-  waiting: "Waiting",
-  blocked: "Blocked",
-  unknown: "Unknown",
+  waiting: "Waiting for you",
+  blocked: "Verification failed",
+  unknown: "Planning unavailable",
   stale: "Stale",
-  ready: "Ready",
+  ready: "Next action",
   working: "Working",
-  idle: "Idle",
+  idle: "No signal",
 };
 
-/** States that count toward the status-bar attention figure. */
-export const ATTENTION_STATES = new Set(["waiting", "blocked", "unknown", "stale"]);
-
-/** Provider capability matrix (Muxy docs, Events → agent.status). */
-export const PROVIDER_WAITING_SUPPORT = {
-  antigravity: false,
-  claude: true,
-  droid: true,
-  grok: true,
-  opencode: true,
-  pi: false,
-  cursor: false,
-  kiro: false,
-  codex: true,
-  xal: false,
-};
+/** Explicit status signals shown in the cross-project signal list. */
+export const SIGNAL_STATES = new Set(["waiting", "blocked", "unknown", "stale"]);
 
 export const PARSER_VERSION = "gsd-parser/1.0";
 /**
@@ -58,7 +33,7 @@ export const EXTENSION_VERSION =
 export const BOUNDS = {
   maxWarnings: 8,
   maxErrors: 8,
-  maxBlockers: 12,
+  maxNotes: 12,
   maxEvidence: 12,
   maxDiagnostics: 50,
   maxPhases: 200,
@@ -93,8 +68,7 @@ export const BOUNDS = {
  * @property {GsdProgress} [progress]
  * @property {string} [lastActivity]         Freshest ISO date across artifact timestamps
  * @property {string} [lastActivityDesc]     Free-text tail of "Last activity:" (e.g. what started)
- * @property {string[]} blockers             ONLY when artifacts explicitly say blocked
- * @property {string[]} concerns             Notes under "Blockers/Concerns" — never blocking alone
+ * @property {string[]} concerns             Display-only notes under "Blockers/Concerns"
  * @property {"passed"|"failed"|"pending"|"unknown"} verification
  * @property {string} [verificationDetail]
  * @property {string} [nextAction]           Explicit next action derived from artifacts only
@@ -142,16 +116,9 @@ export const BOUNDS = {
  * @property {AgentState} agent
  * @property {GitContext} [git]
  * @property {ControlState} controlState
- * @property {string} [attentionReason]
+ * @property {string} [statusReason]
  * @property {string} refreshedAt            ISO timestamp of last full refresh
  * @property {Freshness} freshness
- */
-
-/**
- * @typedef {Object} AttentionItem
- * @property {WorkstreamSnapshot} workstream
- * @property {number} priority
- * @property {string} reason
  */
 
 /** Clamp helper used across bounded stores. */

@@ -32,6 +32,25 @@ test("refresh requests coalesce into one follow-up while a refresh is in flight"
   assert.equal(app.refreshing, false);
 });
 
+test("automatic cross-project refresh follows the user interval and never polls agents", () => {
+  const app = bareApp();
+  let refreshes = 0;
+  app.fullRefresh = () => { refreshes += 1; };
+  app.state.diagnostics.lastFullRefresh = "2026-08-24T00:54:00Z";
+  app.prefs = { refreshIntervalMinutes: 5 };
+  assert.equal(app.maybeAutoRefresh(Date.parse("2026-08-24T01:00:00Z")), true);
+  assert.equal(refreshes, 1);
+
+  app.prefs = { refreshIntervalMinutes: 0 };
+  assert.equal(app.maybeAutoRefresh(Date.parse("2026-08-24T02:00:00Z")), false);
+  assert.equal(refreshes, 1);
+
+  app.prefs = { refreshIntervalMinutes: 5 };
+  app.refreshing = true;
+  assert.equal(app.maybeAutoRefresh(Date.parse("2026-08-24T02:00:00Z")), false);
+  assert.equal(refreshes, 1);
+});
+
 test("extension.snapshot promise rejections become bounded diagnostics", async () => {
   const app = bareApp();
   app.state = initialState();
@@ -70,7 +89,7 @@ test("worktree permission failures are explicit instead of silent empty inventor
   try {
     assert.equal(await app.performFullRefresh(), true);
     const row = app.state.workstreams.get("p1::root");
-    assert.match(row.inventoryWarning, /Worktree inventory unavailable/);
+    assert.equal(row.inventoryWarning, "Project details unavailable");
     assert.ok(app.state.diagnostics.errors.some((entry) => entry.context === "inventory"));
     assert.equal(app.state.diagnostics.permissionProbes["worktrees.list"], false);
   } finally {
