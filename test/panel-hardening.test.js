@@ -6,14 +6,11 @@ import { initialState } from "../src/core/reducer.js";
 function bareApp() {
   const app = new ControlTowerApp(null);
   app.render = () => {};
-  app.publishCounts = () => {};
   app.maybeAutoFocusActiveProject = () => {};
   return app;
 }
 
 test("header counts use singular and plural labels", () => {
-  assert.equal(countLabel(1, "signal"), "1 signal");
-  assert.equal(countLabel(2, "signal"), "2 signals");
   assert.equal(countLabel(1, "workstream"), "1 workstream");
   assert.equal(countLabel(0, "workstream"), "0 workstreams");
 });
@@ -73,23 +70,6 @@ test("automatic cross-project refresh follows the user interval and never polls 
   app.refreshing = true;
   assert.equal(app.maybeAutoRefresh(Date.parse("2026-08-24T02:00:00Z")), false);
   assert.equal(refreshes, 1);
-});
-
-test("extension.snapshot promise rejections become bounded diagnostics", async () => {
-  const app = bareApp();
-  app.state = initialState();
-  app.currentRows = () => [];
-  app.updateStatusBar = () => {};
-  const previous = globalThis.muxy;
-  globalThis.muxy = { events: { emit: () => Promise.reject(new Error("background unavailable")) } };
-  try {
-    ControlTowerApp.prototype.publishCounts.call(app);
-    await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(app.state.diagnostics.errors.length, 1);
-    assert.match(app.state.diagnostics.errors[0].message, /extension\.snapshot: background unavailable/);
-  } finally {
-    globalThis.muxy = previous;
-  }
 });
 
 test("worktree permission failures are explicit instead of silent empty inventory", async () => {

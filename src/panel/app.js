@@ -1,8 +1,7 @@
 /**
  * GSD Control Tower — panel application.
- * Owns inventory + GSD parsing (webview-only APIs), renders factual status
- * signals, the project view (phase evidence and planning notes),
- * filters, diagnostics, and preferences.
+ * Owns inventory + GSD parsing (webview-only APIs), renders recorded project
+ * state and agent activity, and provides search, diagnostics, and preferences.
  *
  * Navigation model: two base views (`list`, `project`) plus full-body overlays
  * (`settings`, `diagnostics`). The panel defaults into the active project's
@@ -15,24 +14,19 @@ import {
   applyInventory, applyAgentEvent, applyAgentHydration, applyFileChanged,
   applyHeadChanged, applyWorkstreamData, pushDiagnostic, setDiagnostics,
 } from "../core/reducer.js";
+import { buildRows, filterRows } from "../core/selectors.js";
 import {
-  buildRows, signalRows, signalCounts, statusCounts, filterRows,
-} from "../core/selectors.js";
-import {
-  CONTROL_LABELS, PARSER_VERSION, EXTENSION_VERSION, BOUNDS,
+  PARSER_VERSION, EXTENSION_VERSION, BOUNDS,
 } from "../core/types.js";
 import { buildGsdSnapshot } from "../core/gsd/parse-planning.js";
-import { planNavigation } from "../core/navigation.js";
 import { bridge, call, hasCapability, fileSource, normalizeAgentItems } from "../host/muxy.js";
 import {
   loadPrefs, savePrefs, resetPrefs, REFRESH_INTERVAL_OPTIONS, refreshDue,
 } from "../host/prefs.js";
 
-const SIGNAL_ORDER = ["waiting", "blocked", "unknown", "stale"];
-
-/** Control state → semantic CSS custom property (see global.css). */
-export function stateColor(controlState) {
-  return `var(--st-${controlState}, var(--st-idle))`;
+/** Muxy runtime state → semantic CSS custom property (see global.css). */
+export function stateColor(runtimeState) {
+  return `var(--st-${runtimeState}, var(--st-idle))`;
 }
 
 export function countLabel(count, singular, plural = `${singular}s`) {
@@ -57,6 +51,7 @@ export class ControlTowerApp {
     this.savePrefsTimer = null;
     this.searchTimer = null;
     this.maintenanceTimer = null;
+    this.scrollPositions = new Map();
   }
 
   async start() {
@@ -65,11 +60,10 @@ export class ControlTowerApp {
     this.wireKeyboard();
     this.render();
     this.fullRefresh();
-    // Recompute staleness and check the user-selected planning/Git refresh
-    // interval. Agent state stays event-driven through `agent.status`.
+    // Check the user-selected planning/Git refresh interval. Agent state stays
+    // event-driven through `agent.status`.
     this.maintenanceTimer = setInterval(() => {
       this.maybeAutoRefresh();
-      if (!this.overlay) this.render();
     }, 30_000);
   }
 
@@ -90,7 +84,6 @@ export class ControlTowerApp {
     sub("agent.status", (evt) => {
       this.state = applyAgentEvent(this.state, evt);
       this.render();
-      this.publishCounts();
     });
 
     sub("file.changed", (evt) => {
@@ -210,7 +203,6 @@ export class ControlTowerApp {
       if (refreshed) {
         this.loaded = true;
         this.maybeAutoFocusActiveProject();
-        this.publishCounts();
       }
       this.render();
     }
@@ -337,7 +329,6 @@ export class ControlTowerApp {
     }
     this.state = applyInventory(this.state, projects, worktreesByProject);
     this.render();
-    this.publishCounts();
   }
 
   async refreshProjectById(projectId) {
@@ -433,51 +424,12 @@ export class ControlTowerApp {
     await Promise.all(workers);
   }
 
-  // -------------------------------------------------------------- publishing --
-
   currentRows() {
-    return buildRows(this.state, this.prefs ?? {}, Date.now());
+    return buildRows(this.state, this.prefs ?? {});
   }
 
   currentProjectRow() {
     return this.currentRows().find((r) => r.key === this.selectedKey);
-  }
-
-  /** Push counts to the status bar + background cache (works while panel is open). */
-  publishCounts() {
-    const rows = this.currentRows();
-    const signals = signalRows(rows);
-    const waitingIds = rows
-      .filter((r) => r.controlState === "waiting")
-      .map((r) => r.worktreeId)
-      .filter(Boolean);
-    this.updateStatusBar(signals.length);
-    try {
-      const emission = bridge()?.events?.emit?.("extension.snapshot", {
-        signalCount: signals.length,
-        total: rows.length,
-        waitingIds,
-        at: new Date().toISOString(),
-      });
-      Promise.resolve(emission).catch((error) => {
-        this.state = pushDiagnostic(this.state, {
-          at: new Date().toISOString(),
-          message: `extension.snapshot: ${error?.message ?? error}`,
-          context: "background-sync",
-        });
-      });
-    } catch { /* background may not be running */ }
-  }
-
-  updateStatusBar(count) {
-    const m = bridge();
-    if (!hasCapability("statusbar.set")) return;
-    const payload = count > 0
-      ? { id: "signals", text: String(count), icon: { symbol: "circle.dashed" } }
-      : { id: "signals", text: "", icon: { symbol: "circle.dashed" } };
-    call("statusbar.set", () => m.statusbar.set(payload)).then((res) => {
-      this.recordProbe("statusbar.set", res.error);
-    });
   }
 
   recordProbe(capability, error) {
@@ -514,28 +466,6 @@ export class ControlTowerApp {
     this.render();
   }
 
-  async openContext(row) {
-    const m = bridge();
-    const project = this.state.projects.find((p) => p.id === row.projectId);
-    const { steps, note } = planNavigation(row, project);
-    try {
-      for (const step of steps) {
-        const res = step.kind === "switchProject"
-          ? await call("projects.switchTo", () => m.projects.switchTo(step.projectId))
-          : await call("worktrees.switchTo", () => m.worktrees.switchTo(step.targetId, step.projectId));
-        if (!res.ok) throw new Error(res.error.message);
-      }
-      // Switching projects recreates this panel (per-project session).
-      if (note && steps.length) {
-        this.banner = { kind: "info", message: note };
-        this.render();
-      }
-    } catch (e) {
-      this.banner = { kind: "error", message: `Could not open project: ${e.message}` };
-      this.render();
-    }
-  }
-
   async toggleProjectHidden(projectId) {
     const hidden = new Set(this.prefs.hiddenProjects);
     if (hidden.has(projectId)) hidden.delete(projectId);
@@ -543,7 +473,6 @@ export class ControlTowerApp {
     this.prefs = { ...this.prefs, hiddenProjects: [...hidden] };
     await this.persistPrefs();
     this.render();
-    this.publishCounts();
   }
 
   async persistPrefs() {
@@ -553,7 +482,26 @@ export class ControlTowerApp {
 
   // ------------------------------------------------------------------ render --
 
+  scrollKey() {
+    if (this.overlay) return `overlay:${this.overlay}`;
+    if (this.view === "project") return `project:${this.selectedKey ?? "unknown"}`;
+    return "list";
+  }
+
+  rememberScrollPosition() {
+    const body = this.root?.querySelector?.(".ct-body[data-scroll-key]");
+    const key = body?.dataset?.scrollKey;
+    if (key) this.scrollPositions.set(key, body.scrollTop ?? 0);
+  }
+
+  restoreScrollPosition() {
+    const body = this.root?.querySelector?.(".ct-body[data-scroll-key]");
+    const key = body?.dataset?.scrollKey;
+    if (key) body.scrollTop = this.scrollPositions.get(key) ?? 0;
+  }
+
   render() {
+    this.rememberScrollPosition();
     const active = document.activeElement;
     const focusId = active?.dataset?.preserveFocus ?? null;
     const selStart = active?.selectionStart ?? null;
@@ -584,20 +532,25 @@ export class ControlTowerApp {
         try { el.setSelectionRange(selStart, selEnd); } catch { /* not a text input */ }
       }
     }
+    this.restoreScrollPosition();
   }
 
   viewRoot() {
     const rows = this.currentRows();
-    const signals = signalRows(rows);
+    const body = this.renderBody(rows);
+    body.dataset.scrollKey = this.scrollKey();
 
     return h("div", { class: "ct-root" },
-      this.renderHeader(rows, signals.length),
+      this.renderHeader(rows),
       this.renderBanner(),
-      this.renderBody(rows, signals),
+      body,
     );
   }
 
-  renderHeader(rows, signalCount) {
+  renderHeader(rows) {
+    const visibleCount = this.view === "list" && !this.overlay
+      ? filterRows(rows, this.prefs?.filters ?? {}).filter((row) => this.prefs?.showNonGsd || row.isGsd).length
+      : null;
     const overlayBtn = (id, iconName, label, name) =>
       h("button", {
         class: "ct-iconbtn", "data-active": this.overlay === name,
@@ -624,13 +577,12 @@ export class ControlTowerApp {
     return h("header", { class: "ct-header" },
       h("div", { class: "ct-title-row" },
         h("div", { class: "ct-crumbs" }, ...crumbs),
-        h("span", { class: "ct-count", "data-hot": signalCount > 0,
-          title: `${signalCount} of ${rows.length} workstreams have status signals`,
+        visibleCount == null ? null : h("span", {
+          class: "ct-count",
+          title: countLabel(visibleCount, "visible workstream"),
         },
-          signalCount > 0 ? icon("info", 12) : icon("check", 12),
-          signalCount > 0
-            ? countLabel(signalCount, "signal")
-            : countLabel(rows.length, "workstream"),
+          icon("layers", 12),
+          countLabel(visibleCount, "workstream"),
         ),
         h("span", { class: "ct-spacer" }),
         this.refreshing
@@ -650,9 +602,7 @@ export class ControlTowerApp {
   }
 
   renderFilterRow() {
-    const f = this.prefs?.filters ?? { query: "", statuses: [] };
-    const rows = this.currentRows();
-    const counts = signalCounts(rows);
+    const f = this.prefs?.filters ?? { query: "" };
 
     return h("div", { class: "ct-searchrow" },
       h("div", { class: "ct-searchwrap" },
@@ -672,28 +622,7 @@ export class ControlTowerApp {
           },
         }),
       ),
-      h("div", { class: "ct-chips", style: "flex-basis:100%" },
-        SIGNAL_ORDER
-          .filter((s) => (counts[s] ?? 0) > 0)
-          .map((s) => {
-            const on = f.statuses.includes(s);
-            return h("button", {
-              class: "ct-chip", "data-on": on, style: `--chip-color:${stateColor(s)}`,
-              "aria-pressed": on, title: `Filter: ${CONTROL_LABELS[s]} (${counts[s]})`,
-              onclick: () => this.toggleStatusFilter(s),
-            }, h("span", { class: "dot" }), `${CONTROL_LABELS[s]} ${counts[s]}`);
-          }),
-      ),
     );
-  }
-
-  async toggleStatusFilter(status) {
-    const statuses = new Set(this.prefs.filters.statuses);
-    if (statuses.has(status)) statuses.delete(status);
-    else statuses.add(status);
-    this.prefs = { ...this.prefs, filters: { ...this.prefs.filters, statuses: [...statuses] } };
-    await this.persistPrefs();
-    this.render();
   }
 
   renderBanner() {
@@ -711,14 +640,14 @@ export class ControlTowerApp {
     );
   }
 
-  renderBody(rows, signals) {
+  renderBody(rows) {
     if (this.overlay === "settings") return this.renderSettings();
     if (this.overlay === "diagnostics") return this.renderDiagnostics();
     if (this.view === "project") return this.renderProject();
-    return this.renderList(rows, signals);
+    return this.renderList(rows);
   }
 
-  renderList(rows, signals) {
+  renderList(rows) {
     const body = h("div", { class: "ct-body" });
 
     if (!this.loaded && !rows.length) {
@@ -736,37 +665,21 @@ export class ControlTowerApp {
     }
 
     const visible = filterRows(rows, this.prefs?.filters ?? {});
-    const visibleSignals = signalRows(visible);
-
-    if (visibleSignals.length) {
-      body.appendChild(h("div", { class: "ct-section-label" }, "Status signals", h("span", null, `· ${visibleSignals.length}`)));
-      const card = h("div", { class: "ct-card", role: "list" });
-      for (const row of visibleSignals) card.appendChild(this.renderRow(row, { emphasized: true }));
-      body.appendChild(card);
-    }
-
-    // Non-GSD projects are hidden from the list by default (they still surface
-    // when Muxy reports a waiting agent); a quiet line keeps them discoverable.
     const showNonGsd = !!this.prefs?.showNonGsd;
-    const signalKeys = new Set(signals.map((row) => row.key));
-    const rest = visible.filter((r) => !signalKeys.has(r.key) && (showNonGsd || r.isGsd));
-    const hiddenNonGsd = visible.filter((r) => !signalKeys.has(r.key) && !r.isGsd).length;
+    const listed = visible.filter((row) => showNonGsd || row.isGsd);
+    const hiddenNonGsd = visible.filter((row) => !row.isGsd).length;
 
-    if (rest.length) {
-      body.appendChild(h("div", { class: "ct-section-label" }, "All workstreams", h("span", null, `· ${rest.length}`)));
+    if (listed.length) {
+      body.appendChild(h("div", { class: "ct-section-label" }, "All workstreams", h("span", null, `· ${listed.length}`)));
       const card = h("div", { class: "ct-card", role: "list" });
-      for (const row of rest) card.appendChild(this.renderRow(row, {}));
+      for (const row of listed) card.appendChild(this.renderRow(row));
       body.appendChild(card);
     }
 
     if (!visible.length) {
       body.appendChild(this.renderEmpty(
         "search", "Nothing matches",
-        "Adjust the search or status filters to see more workstreams."));
-    } else if (!rest.length && visibleSignals.length) {
-      body.appendChild(this.renderEmpty(
-        "check", "No other workstreams",
-        "Every visible workstream currently has a status signal."));
+        "Adjust the search to see more workstreams."));
     }
 
     if (!showNonGsd && hiddenNonGsd > 0) {
@@ -790,12 +703,11 @@ export class ControlTowerApp {
     return h("div", { class: "ct-empty" }, icon(iconName, 14), h("div", { style: "font-weight:600; color:var(--muxy-foreground)" }, title), h("div", { class: "hint" }, hint));
   }
 
-  renderRow(row, { emphasized = false } = {}) {
+  renderRow(row) {
     const gsd = row.gsd;
     const provider = row.agent?.providerId;
-    const signalLabels = (row.signals ?? []).map((signal) => CONTROL_LABELS[signal.state]);
-    const line2 = (signalLabels.length ? signalLabels.join(" · ") : null)
-      ?? row.statusReason
+    const runtime = row.agent?.runtimeState ?? "unavailable";
+    const line2 = verificationSummary(gsd)
       ?? summarizeGsd(gsd, row)
       ?? row.inventoryWarning
       ?? row.gsdUnavailableReason
@@ -803,13 +715,13 @@ export class ControlTowerApp {
 
     return h("button", {
       class: "ct-row", role: "listitem", "data-selected": this.selectedKey === row.key,
-      "aria-label": `${row.projectName}: ${signalLabels.length ? signalLabels.join(", ") : CONTROL_LABELS[row.controlState]}`,
+      "aria-label": `${row.projectName}: ${formatRuntime(runtime)}`,
       onclick: () => this.openProject(row),
     },
       h("span", {
-        class: "ct-statusmark", style: `--dot:${stateColor(row.controlState)}`,
-        "data-pulse": row.controlState === "waiting", "aria-hidden": "true",
-      }, icon(statusIconName(row.controlState), 14)),
+        class: "ct-statusmark", style: `--dot:${stateColor(runtime)}`,
+        "data-pulse": runtime === "waiting", "aria-hidden": "true",
+      }, icon(statusIconName(runtime), 14)),
       h("span", { class: "ct-main" },
         h("span", { class: "ct-line1" },
           h("span", { class: "ct-proj" }, row.projectName),
@@ -817,12 +729,11 @@ export class ControlTowerApp {
             ? h("span", { class: "ct-wt" }, `⎇ ${row.git?.branch || row.worktreeName}`)
             : (row.git?.branch ? h("span", { class: "ct-wt" }, `⎇ ${row.git.branch}`) : null),
         ),
-        h("span", { class: "ct-line2", "data-reason": !!row.statusReason || signalLabels.length > 0 }, line2),
+        h("span", { class: "ct-line2" }, line2),
       ),
       h("span", { class: "ct-side" },
         provider ? h("span", { class: "ct-provider", title: `Agent: ${formatProvider(provider)}` }, formatProvider(provider)) : null,
-        emphasized || row.controlState !== "idle" ? h("span", { class: "ct-runtime" },
-          signalLabels.length > 1 ? `${signalLabels.length} signals` : CONTROL_LABELS[row.controlState]) : null,
+        runtime !== "unavailable" ? h("span", { class: "ct-runtime" }, formatRuntime(runtime)) : null,
         h("span", { class: "ct-time" }, relativeTime(freshestTimestamp(row))),
         icon("chevronRight", 12),
       ),
@@ -840,7 +751,8 @@ export class ControlTowerApp {
     }
 
     const gsd = row.gsd;
-    const stateColorValue = stateColor(row.controlState);
+    const runtime = row.agent?.runtimeState ?? "unavailable";
+    const stateColorValue = stateColor(runtime);
 
     // -- breadcrumb head (explicit way back to the tower)
     body.appendChild(h("div", { class: "ct-detail-head" },
@@ -850,28 +762,22 @@ export class ControlTowerApp {
       h("span", { class: "ct-detail-title" }, row.projectName),
     ));
 
-    // -- factual status summary
-    const factualSignals = row.signals ?? [];
+    // -- recorded state summary; displayed verbatim, never interpreted
     body.appendChild(h("div", { class: "ct-statecard", style: `--dot:${stateColorValue}` },
       h("span", {
         class: "ct-statusmark", style: `--dot:${stateColorValue}`,
-        "data-pulse": row.controlState === "waiting", "aria-hidden": "true",
-      }, icon(statusIconName(row.controlState), 14)),
+        "data-pulse": runtime === "waiting", "aria-hidden": "true",
+      }, icon("info", 14)),
       h("div", { class: "ct-state-main" },
-        h("div", { class: "label" }, factualSignals.length > 1 ? "Status signals" : CONTROL_LABELS[row.controlState]),
-        factualSignals.length
-          ? h("div", { class: "ct-signal-list" }, factualSignals.map((signal) =>
-              h("div", null,
-                h("strong", null, `${CONTROL_LABELS[signal.state]}: `), signal.reason)))
-          : h("div", { style: "font-size:var(--font-body)" },
-              row.statusReason ?? summarizeGsd(gsd, row) ?? row.gsdUnavailableReason ?? "No status signal."),
+        h("div", { class: "label" }, "Recorded GSD state"),
+        h("div", { style: "font-size:var(--font-body)" },
+          gsd?.statusLine ?? gsd?.frontmatterStatus
+            ?? summarizeGsd(gsd, row) ?? row.gsdUnavailableReason ?? "No status recorded."),
       ),
     ));
 
-    // -- navigation and refresh actions
+    // -- refresh action
     const actions = h("div", { class: "ct-actions" },
-      h("button", { class: "ct-btn primary", onclick: () => this.openContext(row) },
-        icon("open", 13), "Open in Muxy"),
       h("button", {
         class: "ct-btn",
         onclick: () => {
@@ -915,7 +821,7 @@ export class ControlTowerApp {
         body.appendChild(disclosure("Notes",
           h("div", { class: "ct-card" },
             gsd.concerns.map((c) => h("div", { class: "ct-kv" },
-              h("span", { class: "k", style: "color: var(--st-stale); font-weight:600" }, "Note"),
+              h("span", { class: "k", style: "color: var(--muxy-foreground-muted); font-weight:600" }, "Note"),
               h("span", { class: "v" }, c))))));
       }
 
@@ -1038,24 +944,6 @@ export class ControlTowerApp {
 
     card.appendChild(h("div", { class: "ct-setting" },
       h("div", { class: "grow" },
-        h("div", { class: "name" }, "Stale after"),
-        h("div", { class: "desc" }, "Open work with no updates for this long is marked Stale.")),
-      h("input", {
-        class: "ct-input-num mono", type: "number", min: "5", max: "1440", step: "5",
-        value: String(p.staleThresholdMinutes), "aria-label": "Stale threshold in minutes",
-        onchange: async (e) => {
-          const v = Math.min(1440, Math.max(5, Number(e.target.value) || 45));
-          this.prefs = { ...this.prefs, staleThresholdMinutes: v };
-          e.target.value = String(v);
-          await this.persistPrefs();
-          this.render();
-        },
-      }),
-      h("span", { class: "desc" }, "min"),
-    ));
-
-    card.appendChild(h("div", { class: "ct-setting" },
-      h("div", { class: "grow" },
         h("div", { class: "name" }, "Refresh planning and Git"),
         h("div", { class: "desc" }, "Agent activity stays live through Muxy events. This interval refreshes cross-project files and Git data while the panel is open.")),
       h("select", {
@@ -1121,13 +1009,12 @@ export class ControlTowerApp {
           const m = bridge();
           const choice = await m?.dialog?.confirm?.({
             title: "Reset Control Tower preferences?",
-            message: "Filters, refresh settings, thresholds, and included projects return to defaults. No project files are touched.",
+            message: "Search, refresh settings, and included projects return to defaults. No project files are touched.",
             buttons: ["Reset", "Cancel"],
           });
           if (choice === "Reset") {
             this.prefs = await resetPrefs();
             this.render();
-            this.publishCounts();
           }
         },
       }, "Reset preferences"),
@@ -1159,7 +1046,6 @@ export class ControlTowerApp {
       ["agents.list", "Agent activity", "agents:read"],
       ["files.read", "Planning files", "files:read"],
       ["git.status", "Git", "git:read"],
-      ["statusbar.set", "Status bar", "panels:write"],
       ["storage.get", "Preferences", "storage:read"],
     ];
     for (const [cap, label, perm] of capRows) {
@@ -1230,7 +1116,7 @@ export class ControlTowerApp {
       `Last full refresh: ${d.lastFullRefresh ?? "never"}`,
       `Subscriptions: ${d.subscriptions.join(", ") || "none"}`,
       `Capabilities: ${JSON.stringify(d.permissionProbes)}`,
-      `Workstreams: ${rows.length} — ${JSON.stringify(statusCounts(rows))}`,
+      `Workstreams: ${rows.length}`,
       `Recent issues (${d.errors.length}/${BOUNDS.maxDiagnostics}):`,
       ...d.errors.map((e) => `- ${e.at} [${e.context ?? "general"}] ${e.message}`),
     ].join("\n");
@@ -1266,6 +1152,12 @@ function summarizeGsd(gsd, row) {
   if (gsd.milestone) bits.push(gsd.milestone);
   if (gsd.phaseLabel || gsd.phaseName) bits.push(gsd.phaseLabel ?? gsd.phaseName);
   return bits.length ? bits.join(" · ") : null;
+}
+
+/** Typed verification is displayed as a field, never promoted to priority. */
+function verificationSummary(gsd) {
+  if (!gsd?.recognized || gsd.verification === "unknown") return null;
+  return `Verification: ${formatVerification(gsd.verification, gsd.verificationDetail)}`;
 }
 
 /** Freshest timestamp worth showing on a row: activity beats refresh time. */
@@ -1306,8 +1198,8 @@ function stageChip(label, state, extra) {
 
 /** Per-phase label from explicit phase/checklist/handoff/verification evidence. */
 export function phaseStatusOf(ph) {
-  if (ph.verification === "failed") return { label: "Verification failed", color: "var(--st-blocked)" };
-  if (ph.done) return { label: "Complete", color: "var(--st-ready)" };
+  if (ph.verification === "failed") return { label: "Verification failed", color: "var(--muxy-diff-remove)" };
+  if (ph.done) return { label: "Complete", color: "var(--muxy-diff-add)" };
   if (ph.pausedMarker) return { label: "Paused", color: "var(--st-waiting)" };
   if (ph.isCurrent) return { label: "Current", color: "var(--muxy-accent)" };
   if (!ph.dir) return { label: "Planned", color: "var(--muxy-foreground-muted)" };
@@ -1370,12 +1262,9 @@ function crumbSep() {
 function statusIconName(state) {
   switch (state) {
     case "waiting": return "pause";
-    case "blocked": return "warning";
-    case "unknown": return "info";
-    case "stale": return "clock";
-    case "ready": return "bolt";
     case "working": return "bolt";
-    default: return "check";
+    case "idle": return "check";
+    default: return "info";
   }
 }
 

@@ -7,17 +7,13 @@
   --icon-sm: 12px; --icon: 14px; --control: 24px; --text-control: 28px; --row-height: 34px;
   --radius: 6px; --radius-chip: 4px; --radius-card: 8px;
 
-  /* Semantic state colors mapped onto sanctioned theme tokens */
+  /* Muxy-reported agent runtime colors */
   --st-waiting: var(--muxy-accent);
   --st-working: color-mix(in srgb, var(--muxy-accent) 55%, var(--muxy-foreground));
-  --st-blocked: var(--muxy-diff-remove);
-  --st-unknown: var(--muxy-diff-hunk, var(--muxy-foreground-muted));
-  --st-stale: var(--muxy-foreground-muted);
-  --st-ready: var(--muxy-diff-add);
   --st-idle: var(--muxy-foreground-muted);
 }
 
-html, body, #root { height: 100vh; margin: 0; }
+html, body, #root { height: 100%; min-height: 0; margin: 0; }
 body {
   overflow: hidden;
   background: var(--muxy-background);
@@ -31,7 +27,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--muxy-accent
 .mono { font-family: "SF Mono", Menlo, monospace; }
 
 /* ---- Layout -------------------------------------------------------------- */
-.ct-root { display: flex; flex-direction: column; height: 100%; }
+.ct-root { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .ct-header {
   flex: 0 0 auto;
   padding: var(--s4) var(--s5) var(--s3);
@@ -39,7 +35,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--muxy-accent
   border-bottom: 1px solid var(--muxy-border);
   background: var(--muxy-background);
 }
-.ct-body { flex: 1 1 auto; overflow-y: auto; padding: var(--s4) var(--s5) var(--s7); }
+.ct-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--s4) var(--s5) var(--s7); }
 
 /* ---- Header --------------------------------------------------------------- */
 .ct-title-row { display: flex; align-items: center; gap: var(--s3); min-height: var(--text-control); }
@@ -211,8 +207,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--muxy-accent
 }
 .ct-state-main { flex: 1 1 auto; min-width: 0; }
 .ct-statecard .label { font-weight: 700; font-size: var(--font-caption); letter-spacing: 0.05em; text-transform: uppercase; color: var(--dot, var(--muxy-foreground-muted)); }
-.ct-signal-list { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s1); font-size: var(--font-body); }
-.ct-signal-list strong { font-weight: 600; }
 
 .ct-block { margin-bottom: var(--s4); }
 .ct-block > .ct-blocktitle {
@@ -322,9 +316,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--muxy-accent
   border: 1px solid var(--muxy-border); border-radius: var(--radius-chip);
   white-space: nowrap;
 }
-.ct-stage[data-state="done"] { color: var(--st-ready); border-color: color-mix(in srgb, var(--st-ready) 40%, transparent); }
+.ct-stage[data-state="done"] { color: var(--muxy-diff-add); border-color: color-mix(in srgb, var(--muxy-diff-add) 40%, transparent); }
 .ct-stage[data-state="part"] { color: var(--muxy-accent); border-color: color-mix(in srgb, var(--muxy-accent) 45%, transparent); }
-.ct-stage[data-state="failed"] { color: var(--st-blocked); border-color: color-mix(in srgb, var(--st-blocked) 45%, transparent); }
+.ct-stage[data-state="failed"] { color: var(--muxy-diff-remove); border-color: color-mix(in srgb, var(--muxy-diff-remove) 45%, transparent); }
 .ct-stage[data-state="off"] { color: var(--muxy-foreground-muted); background: var(--muxy-surface-solid); }
 .ct-phase-body {
   margin: 0 var(--s3) var(--s2) var(--ct-indent);

@@ -4,22 +4,7 @@
  */
 
 /** @typedef {"working"|"waiting"|"idle"|"unavailable"} RuntimeState */
-/** @typedef {"waiting"|"blocked"|"working"|"ready"|"stale"|"idle"|"unknown"} ControlState */
 /** @typedef {"live"|"refreshed"|"stale"} Freshness */
-
-/** Human labels for control states. */
-export const CONTROL_LABELS = {
-  waiting: "Waiting for you",
-  blocked: "Verification failed",
-  unknown: "Planning unavailable",
-  stale: "Stale",
-  ready: "Next action",
-  working: "Working",
-  idle: "No signal",
-};
-
-/** Explicit status signals shown in the cross-project signal list. */
-export const SIGNAL_STATES = new Set(["waiting", "blocked", "unknown", "stale"]);
 
 export const PARSER_VERSION = "gsd-parser/1.0";
 /**
@@ -115,8 +100,6 @@ export const BOUNDS = {
  * @property {string} [inventoryWarning]      Worktree inventory could not be queried; row is project-scoped
  * @property {AgentState} agent
  * @property {GitContext} [git]
- * @property {ControlState} controlState
- * @property {string} [statusReason]
  * @property {string} refreshedAt            ISO timestamp of last full refresh
  * @property {Freshness} freshness
  */

@@ -1,8 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  buildRows, signalRows, signalCounts, statusCounts, filterRows,
-} from "../src/core/selectors.js";
+import { buildRows, filterRows } from "../src/core/selectors.js";
 import { initialState, applyInventory, applyWorkstreamData, applyAgentHydration } from "../src/core/reducer.js";
 
 function makeStore() {
@@ -50,14 +48,14 @@ function makeStore() {
   return state;
 }
 
-const PREFS = { staleThresholdMinutes: 45, refreshIntervalMinutes: 5, showNonGsd: true, hiddenProjects: ["p-hidden"], filters: { query: "", statuses: [] } };
+const PREFS = { refreshIntervalMinutes: 5, showNonGsd: true, hiddenProjects: ["p-hidden"], filters: { query: "" } };
 
-test("rows sort predictably by project name and expose factual signal rows", () => {
+test("rows sort predictably by project name without deriving priority", () => {
   const rows = buildRows(makeStore(), PREFS);
   assert.deepEqual(rows.map((row) => row.projectName), [
     "alpha-blocked", "mid-idle-complete", "plain-project", "zeta-waiting",
   ]);
-  assert.deepEqual(signalRows(rows).map((r) => r.projectName), ["alpha-blocked", "zeta-waiting"]);
+  assert.equal(rows.some((row) => "controlState" in row || "signals" in row), false);
 });
 
 test("hidden projects are excluded (FR-004)", () => {
@@ -65,23 +63,9 @@ test("hidden projects are excluded (FR-004)", () => {
   assert.ok(!rows.some((r) => r.projectId === "p-hidden"));
 });
 
-test("counts aggregate by control state", () => {
-  const counts = statusCounts(buildRows(makeStore(), PREFS));
-  assert.equal(counts.waiting, 1);
-  assert.equal(counts.blocked, 1);
-  assert.equal(counts.idle, 2);
-});
-
-test("signal counts include every factual signal rather than only the row label", () => {
-  const rows = buildRows(makeStore(), PREFS);
-  const counts = signalCounts(rows);
-  assert.equal(counts.waiting, 1);
-  assert.equal(counts.blocked, 1);
-});
-
-test("filters: query across names/paths/reasons and factual statuses", () => {
+test("filters search recorded fields without status facets", () => {
   const rows = buildRows(makeStore(), PREFS);
   assert.equal(filterRows(rows, { query: "zeta" }).length, 1);
-  assert.equal(filterRows(rows, { query: "verification" }).length, 1);
-  assert.deepEqual(filterRows(rows, { statuses: ["blocked"] }).map((r) => r.projectName), ["alpha-blocked"]);
+  assert.equal(filterRows(rows, { query: "failed" }).length, 1);
+  assert.equal(filterRows(rows, { query: "waiting" }).length, 1);
 });
