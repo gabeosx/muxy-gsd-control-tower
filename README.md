@@ -6,7 +6,7 @@ GSD Control Tower brings [GSD](https://github.com/open-gsd/gsd-core) project pro
 
 Planning status comes from each project's `.planning/` files. Agent status is available for sessions running inside Muxy.
 
-![GSD Control Tower showing the active Atlas Showcase phase pipeline and recorded next action](./assets/readme/active-project.png)
+![GSD Control Tower showing Harbor Relay's seven-phase roadmap and active review queue](./assets/readme/active-project.png)
 
 ## What it tells you
 
@@ -20,7 +20,7 @@ Planning status comes from each project's `.planning/` files. Agent status is av
 
 The **Status signals** list contains workstreams with one or more explicit signals. Rows sort by project and worktree name, and every applicable signal remains visible.
 
-![GSD Control Tower showing explicit status signals across sanitized showcase projects](./assets/readme/status-signals.png)
+![GSD Control Tower showing a failed verification alongside two active project workstreams](./assets/readme/status-signals.png)
 
 | State | Meaning |
 | --- | --- |
