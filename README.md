@@ -18,6 +18,8 @@ The panel opens on the Muxy project you are already in. From there you can:
 
 Control Tower does not interpret free-form status text as proof that work is done or blocked. Completion comes from roadmap checkboxes and counts; failed verification comes from a verification artifact; agent state comes from Muxy.
 
+Phase labels follow the same rule: **Current** comes from `STATE.md`, **Complete** from the roadmap checklist, **Paused** from a handoff marker, and **Verification failed** from a typed verification result. A roadmap-only phase is **Planned**; a phase directory with artifacts that `STATE.md` does not select is explicitly **Not current**.
+
 ## Check every project
 
 Choose **All projects** to see GSD workstreams across the projects in Muxy. Search by project, worktree, branch, phase, next action, or agent, and open any row for its project details.
