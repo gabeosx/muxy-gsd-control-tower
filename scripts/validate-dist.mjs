@@ -25,13 +25,13 @@ const SCREENSHOTS = [
 ];
 const README_IMAGES = [
   "assets/readme/active-project.png",
-  "assets/readme/status-signals.png",
+  "assets/readme/all-projects.png",
 ];
 
 function expectedMuxy() {
   return {
     $schema: "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
-    description: "See what every GSD workstream is doing, which agent needs you, and where to go next — without leaving Muxy.",
+    description: "Read GSD next steps, roadmap progress, and live agent activity across Muxy projects.",
     background: "background.js",
     permissions: PERMISSIONS,
     events: EVENTS,

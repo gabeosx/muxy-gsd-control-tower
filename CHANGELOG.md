@@ -7,6 +7,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 - Established `gabeosx/muxy-gsd-control-tower` as the project repository.
+- Rewrote the README around the current-project and All projects workflows.
+- Replaced synthetic listing artwork with annotated captures of the production panel using disposable GSD data.
+- Tightened the marketplace description to the extension's actual read-only scope.
 
 ### Changed
 - Simplified the panel and documentation around project progress, agent activity, permissions, and limitations.
