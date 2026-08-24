@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ControlTowerApp, countLabel } from "../src/panel/app.js";
+import { ControlTowerApp, countLabel, phaseStatusOf } from "../src/panel/app.js";
 import { initialState } from "../src/core/reducer.js";
 
 function bareApp() {
@@ -16,6 +16,23 @@ test("header counts use singular and plural labels", () => {
   assert.equal(countLabel(2, "signal"), "2 signals");
   assert.equal(countLabel(1, "workstream"), "1 workstream");
   assert.equal(countLabel(0, "workstream"), "0 workstreams");
+});
+
+test("phase labels stay explicit when artifacts and STATE.md disagree", () => {
+  const base = {
+    dir: "03-two-route-mission-spine",
+    done: false,
+    pausedMarker: false,
+    isCurrent: false,
+    verification: "unknown",
+  };
+
+  assert.equal(phaseStatusOf(base).label, "Not current");
+  assert.equal(phaseStatusOf({ ...base, dir: "" }).label, "Planned");
+  assert.equal(phaseStatusOf({ ...base, isCurrent: true }).label, "Current");
+  assert.equal(phaseStatusOf({ ...base, pausedMarker: true, isCurrent: true }).label, "Paused");
+  assert.equal(phaseStatusOf({ ...base, done: true, isCurrent: true }).label, "Complete");
+  assert.equal(phaseStatusOf({ ...base, verification: "failed", done: true }).label, "Verification failed");
 });
 
 test("refresh requests coalesce into one follow-up while a refresh is in flight", async () => {

@@ -17,6 +17,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Added a configurable cross-project planning/Git refresh interval (Manual, 1, 5, 15, or 30 minutes; 5 minutes by default). Agent status remains event-driven.
 - Raw GSD status text is display-only; signals use structured agent, verification, checklist/count, handoff, parser, and date data.
 - Phase rows now show optional workflow artifacts only when present and expanded; missing stages are never treated as incomplete.
+- Phase directories that contain artifacts but are not selected by `STATE.md` now show **Not current** instead of a blank status.
 - Progress display now uses roadmap checkboxes or declared phase counts instead of raw percentages.
 
 ## [0.1.0] - 2026-08-23

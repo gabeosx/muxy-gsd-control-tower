@@ -996,7 +996,9 @@ export class ControlTowerApp {
         h("span", { class: "ct-dot", style: `--dot:${st.color}`, "data-pulse": st.label === "Current" }),
         h("span", { class: "ct-phase-num mono" }, ph.number),
         h("span", { class: "ct-phase-name" }, ph.name ?? ph.dir ?? `Phase ${ph.number}`),
-        st.label ? h("span", { class: "ct-phase-status", style: `color:${st.color}` }, st.label) : null,
+        h("span", {
+          class: "ct-phase-status", style: `color:${st.color}`, title: st.label,
+        }, st.label),
         icon(expanded ? "chevronDown" : "chevronRight", 12),
       ),
       expanded ? h("div", { class: "ct-phase-body" },
@@ -1303,13 +1305,13 @@ function stageChip(label, state, extra) {
 }
 
 /** Per-phase label from explicit phase/checklist/handoff/verification evidence. */
-function phaseStatusOf(ph) {
+export function phaseStatusOf(ph) {
   if (ph.verification === "failed") return { label: "Verification failed", color: "var(--st-blocked)" };
   if (ph.done) return { label: "Complete", color: "var(--st-ready)" };
   if (ph.pausedMarker) return { label: "Paused", color: "var(--st-waiting)" };
   if (ph.isCurrent) return { label: "Current", color: "var(--muxy-accent)" };
   if (!ph.dir) return { label: "Planned", color: "var(--muxy-foreground-muted)" };
-  return { label: "", color: "var(--muxy-foreground-muted)" };
+  return { label: "Not current", color: "var(--muxy-foreground-muted)" };
 }
 
 /** Progress display from explicit roadmap checkboxes or phase counts. */
