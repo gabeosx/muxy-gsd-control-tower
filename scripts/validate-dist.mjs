@@ -13,7 +13,7 @@ const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
 const PERMISSIONS = [
   "projects:read", "worktrees:read", "agents:read", "files:read", "git:read",
-  "panels:write", "storage:read", "storage:write", "projects:write", "worktrees:write",
+  "panels:write", "storage:read", "storage:write",
 ];
 const EVENTS = [
   "agent.status", "file.changed", "projects.changed", "project.switched",
@@ -25,14 +25,13 @@ const SCREENSHOTS = [
 ];
 const README_IMAGES = [
   "assets/readme/active-project.png",
-  "assets/readme/all-projects.png",
+  "assets/readme/phase-details.png",
 ];
 
 function expectedMuxy() {
   return {
     $schema: "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
     description: "Read GSD next steps, roadmap progress, and live agent activity across Muxy projects.",
-    background: "background.js",
     permissions: PERMISSIONS,
     events: EVENTS,
     marketplace: {
@@ -53,8 +52,8 @@ function expectedMuxy() {
       ],
     }],
     statusBarItems: [{
-      id: "signals", icon: { symbol: "circle.dashed" }, text: "",
-      tooltip: "GSD Control Tower — workstreams with status signals", side: "right", command: "toggle-tower",
+      id: "tower", icon: { symbol: "circle.dashed" }, text: "",
+      tooltip: "GSD Control Tower", side: "right", command: "toggle-tower",
     }],
     commands: [
       { id: "toggle-tower", title: "Control Tower: Toggle Panel", defaultShortcut: "cmd+shift+g", action: { kind: "togglePanel", panel: "control-tower" } },
@@ -164,7 +163,7 @@ async function validateBuilt() {
   await validateSchema(source);
   await validateListingAssets(root);
 
-  const declared = new Set(["package.json", "background.js"]);
+  const declared = new Set(["package.json"]);
   await validateListingAssets(dist, declared);
   const panelEntry = resolve(dist, source.muxy.panels[0].entry);
   assert.ok(inside(dist, panelEntry) && (await stat(panelEntry)).isFile(), "panel entry missing");
@@ -175,7 +174,6 @@ async function validateBuilt() {
     assert.ok(inside(dist, assetPath) && (await stat(assetPath)).isFile(), `panel asset missing: ${asset}`);
     declared.add(relative(dist, assetPath));
   }
-  assert.ok((await stat(resolve(dist, source.muxy.background))).isFile(), "background entry missing");
   const files = await filesUnder(dist);
   assert.deepEqual(files, [...declared].sort(), "dist contains undeclared, missing, or exploratory files");
 

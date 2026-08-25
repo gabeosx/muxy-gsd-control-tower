@@ -20,20 +20,17 @@ Control Tower does not interpret free-form status text as proof that work is don
 
 Phase labels follow the same rule: **Current** comes from `STATE.md`, **Complete** from the roadmap checklist, **Paused** from a handoff marker, and **Verification failed** from a typed verification result. A roadmap-only phase is **Planned**; a phase directory with artifacts that `STATE.md` does not select is explicitly **Not current**.
 
+### Inspect phase evidence
+
+Expand any phase to see the workflow artifacts Control Tower found, the plan count, and the recorded verification result. Stage chips reflect files in `.planning/`; they do not infer completion from free-form status text.
+
+![GSD Control Tower showing recorded workflow artifacts, plan counts, and verification for an expanded phase](./assets/readme/phase-details.png)
+
 ## Check every project
 
-Choose **All projects** to see GSD workstreams across the projects in Muxy. Search by project, worktree, branch, phase, next action, or agent, and open any row for its project details.
+Choose **All projects** to see one alphabetical list of GSD workstreams across the projects in Muxy. Search by project, worktree, branch, phase, recorded status, verification result, next action, or agent, and open any row for its project details.
 
-The **Status signals** section is only the attention group at the top of this view. A workstream appears there when:
-
-- A Muxy agent reports that it is waiting for you
-- The current phase has a failed verification result
-- GSD planning data could not be read
-- Structured work remains open without a recent planning or Git update
-
-Working agents and recorded next actions stay in **All workstreams** unless one of those attention conditions also applies.
-
-![GSD Control Tower grouping workstreams that need attention above all other GSD workstreams](./assets/readme/all-projects.png)
+Control Tower does not rank projects or manufacture an attention state. Muxy agent activity, GSD verification, reported status, next action, and parser errors remain separate recorded fields.
 
 ## Install
 
@@ -63,7 +60,6 @@ In Muxy, open **Extensions**, choose **Load Unpacked**, and select this reposito
 Use the gear button in the panel to:
 
 - Choose whether the panel opens on the current project or All projects
-- Set the stale-work threshold
 - Set cross-project refresh to Manual, 1, 5, 15, or 30 minutes
 - Include non-GSD projects or hide individual projects
 
@@ -73,7 +69,7 @@ Planning files for the current project refresh when Muxy reports a relevant file
 
 Control Tower reads project and worktree inventory, GSD planning files, Git status, and Muxy agent state. It stores only preferences and bounded diagnostics in Muxy's extension storage.
 
-The extension does not run commands, edit project files, read terminal output, send notifications, or make network requests. In the marketplace build, project/worktree write access is used only when you choose **Open in Muxy** to switch to the selected context.
+The extension does not run commands, edit project files, switch projects or worktrees, read terminal output, send notifications, or make network requests.
 
 Diagnostics may contain relative planning paths and error messages. They do not contain planning-file bodies, terminal output, transcripts, or credentials.
 
@@ -81,7 +77,6 @@ Diagnostics may contain relative planning paths and error messages. They do not 
 
 - GSD planning data comes from each project's active worktree. Other worktrees still show their Muxy agent and Git context.
 - Agent sessions running outside Muxy do not appear.
-- Open the panel once after restarting Muxy to refresh the status-bar count from planning data.
 - Remote workspaces are not supported in `0.1.0`.
 
 ## Troubleshooting
@@ -90,7 +85,6 @@ Diagnostics may contain relative planning paths and error messages. They do not 
 | --- | --- |
 | Planning data unavailable | Open Diagnostics from the info button. The recent issues list names the file or permission that failed. |
 | No agent activity | Confirm that the agent session is running inside Muxy. |
-| Work is marked stale too quickly | Raise the stale-work threshold in Preferences. |
 | A project is missing | Check Included projects and the non-GSD setting in Preferences, then refresh. |
 
 ## Uninstall

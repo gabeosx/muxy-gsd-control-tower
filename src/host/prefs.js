@@ -41,9 +41,6 @@ export async function resetPrefs() {
 /** Validate + clamp an arbitrary object into a safe prefs shape. */
 export function sanitizePrefs(raw) {
   const out = structuredClone(DEFAULT_PREFS);
-  if (Number.isFinite(raw.staleThresholdMinutes)) {
-    out.staleThresholdMinutes = Math.min(24 * 60, Math.max(5, Math.round(raw.staleThresholdMinutes)));
-  }
   if (REFRESH_INTERVAL_OPTIONS.includes(raw.refreshIntervalMinutes)) {
     out.refreshIntervalMinutes = raw.refreshIntervalMinutes;
   }
@@ -56,8 +53,6 @@ export function sanitizePrefs(raw) {
   }
   if (raw.filters && typeof raw.filters === "object") {
     if (typeof raw.filters.query === "string") out.filters.query = raw.filters.query.slice(0, 200);
-    if (Array.isArray(raw.filters.statuses))
-      out.filters.statuses = raw.filters.statuses.filter((s) => typeof s === "string").slice(0, 12);
   }
   return out;
 }

@@ -38,7 +38,7 @@ export async function buildGsdSnapshot(source, opts = {}) {
   const names = new Set(rootEntries.filter((e) => !e.isDirectory).map((e) => e.name));
   const dirs = new Set(rootEntries.filter((e) => e.isDirectory).map((e) => e.name));
   // `dated` marks timestamps read from artifact content; entries without one
-  // record when WE read the file ("now") and must never feed staleness math.
+  // record when WE read the file ("now") and must not masquerade as a file-change timestamp.
   const addEvidence = (path, observedAt) => {
     const iso = normalizeDateish(observedAt);
     evidence.push({ path, observedAt: iso ?? now, dated: !!iso });
@@ -93,7 +93,7 @@ export async function buildGsdSnapshot(source, opts = {}) {
     }
   }
 
-  // --- paused-handoff signals ----------------------------------------------
+  // --- paused-handoff markers ----------------------------------------------
   let paused = false;
   let nextAction;
   /** @type {string|undefined} */ let pauseDetail;

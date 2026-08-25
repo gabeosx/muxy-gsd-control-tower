@@ -13,7 +13,7 @@ const run = promisify(execFile);
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const ENTRYPOINTS = ["src/main.js", "src/background/main.js"];
+const ENTRYPOINTS = ["src/main.js"];
 const EXCLUDED_COPY_ROOTS = new Set([
   ".git", ".research", ".agents", ".planning", ".qualification", ".gsd", "dist", "node_modules", ".npm-cache",
 ]);
