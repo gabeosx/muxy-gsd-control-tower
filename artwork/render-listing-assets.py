@@ -72,8 +72,8 @@ def crop_project(source: Image.Image) -> Image.Image:
     return source.crop((819, 24, 1360, 746))
 
 
-def crop_list(source: Image.Image) -> Image.Image:
-    return source.crop((819, 24, 1360, 235))
+def crop_phase(source: Image.Image) -> Image.Image:
+    return source.crop((819, 84, 1360, 501))
 
 
 def marketplace_project(capture: Image.Image) -> Image.Image:
@@ -92,31 +92,19 @@ def marketplace_project(capture: Image.Image) -> Image.Image:
     return image
 
 
-def marketplace_list(capture: Image.Image) -> Image.Image:
+def marketplace_phase(capture: Image.Image) -> Image.Image:
     image = background((1600, 1000))
     draw = ImageDraw.Draw(image)
-    label(draw, (96, 116), "ALL PROJECTS", 27)
-    draw.multiline_text((96, 220), "Every workstream,\none clear view.", font=font(74, True), fill=FG, spacing=6)
+    label(draw, (96, 116), "PHASE EVIDENCE", 27)
+    draw.multiline_text((96, 220), "Inspect the work\nbehind each phase.", font=font(67, True), fill=FG, spacing=6)
     draw.multiline_text(
-        (100, 445),
-        "Search recorded GSD fields and live Muxy\nagent activity across every included project.",
+        (100, 430),
+        "Expand a phase to see which workflow artifacts\nexist, completed plans, and recorded verification.",
         font=font(31), fill=MUTED, spacing=14,
     )
-    rounded_capture(image, capture, (840, 150, 660, 258), 24)
-
-    cards = [
-        ("Alphabetical by default", "No manufactured ranking"),
-        ("Recorded fields stay separate", "Status, verification, and next action"),
-        ("Muxy agent activity", "Working, waiting, or idle"),
-    ]
-    y = 492
-    for title, description in cards:
-        draw.rounded_rectangle((840, y, 1500, y + 116), radius=18, fill=(35, 32, 43), outline=BORDER, width=2)
-        draw.ellipse((872, y + 34, 888, y + 50), fill=ACCENT)
-        draw.text((914, y + 22), title, font=font(26, True), fill=FG)
-        draw.text((914, y + 62), description, font=font(21), fill=MUTED)
-        y += 138
-    draw.text((100, 886), "SEARCH · SCAN · RESUME", font=font(21, True), fill=(154, 147, 168))
+    pill(draw, (100, 650, 478, 76), "Evidence from .planning", 26)
+    draw.text((100, 886), "ARTIFACTS · PLANS · VERIFICATION", font=font(21, True), fill=(154, 147, 168))
+    rounded_capture(image, capture, (822, 160, 690, 532), 28)
     return image
 
 
@@ -135,17 +123,18 @@ def readme_project(capture: Image.Image) -> Image.Image:
     return image
 
 
-def readme_list(capture: Image.Image) -> Image.Image:
+def readme_phase(capture: Image.Image) -> Image.Image:
     image = background((760, 475))
     draw = ImageDraw.Draw(image)
-    label(draw, (48, 43), "ALL PROJECTS", 13)
-    draw.multiline_text((48, 83), "Every workstream,\none clear view.", font=font(36, True), fill=FG, spacing=2)
+    label(draw, (42, 48), "PHASE EVIDENCE", 13)
+    draw.multiline_text((42, 91), "Inspect the work\nbehind each phase.", font=font(32, True), fill=FG, spacing=2)
     draw.multiline_text(
-        (420, 91),
-        "Search recorded fields.\nScan alphabetical results.\nResume with context.",
+        (42, 198),
+        "Workflow artifacts, plan counts,\nand recorded verification —\ndirectly from .planning.",
         font=font(16), fill=MUTED, spacing=7,
     )
-    rounded_capture(image, capture, (48, 205, 664, 259), 15)
+    pill(draw, (42, 359, 246, 45), "Read-only evidence", 14)
+    rounded_capture(image, capture, (316, 60, 424, 327), 17)
     return image
 
 
@@ -157,15 +146,15 @@ def save(image: Image.Image, path: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-capture", type=Path, required=True)
-    parser.add_argument("--list-capture", type=Path, required=True)
+    parser.add_argument("--phase-capture", type=Path, required=True)
     args = parser.parse_args()
 
     project = crop_project(Image.open(args.project_capture).convert("RGB"))
-    listing = crop_list(Image.open(args.list_capture).convert("RGB"))
+    phase = crop_phase(Image.open(args.phase_capture).convert("RGB"))
     save(marketplace_project(project), ROOT / "assets/screenshots/screenshot-1.png")
-    save(marketplace_list(listing), ROOT / "assets/screenshots/screenshot-2.png")
+    save(marketplace_phase(phase), ROOT / "assets/screenshots/screenshot-2.png")
     save(readme_project(project), ROOT / "assets/readme/active-project.png")
-    save(readme_list(listing), ROOT / "assets/readme/all-projects.png")
+    save(readme_phase(phase), ROOT / "assets/readme/phase-details.png")
 
 
 if __name__ == "__main__":

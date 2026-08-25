@@ -25,7 +25,7 @@ const SCREENSHOTS = [
 ];
 const README_IMAGES = [
   "assets/readme/active-project.png",
-  "assets/readme/all-projects.png",
+  "assets/readme/phase-details.png",
 ];
 
 function expectedMuxy() {

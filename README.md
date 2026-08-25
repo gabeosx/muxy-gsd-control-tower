@@ -20,13 +20,17 @@ Control Tower does not interpret free-form status text as proof that work is don
 
 Phase labels follow the same rule: **Current** comes from `STATE.md`, **Complete** from the roadmap checklist, **Paused** from a handoff marker, and **Verification failed** from a typed verification result. A roadmap-only phase is **Planned**; a phase directory with artifacts that `STATE.md` does not select is explicitly **Not current**.
 
+### Inspect phase evidence
+
+Expand any phase to see the workflow artifacts Control Tower found, the plan count, and the recorded verification result. Stage chips reflect files in `.planning/`; they do not infer completion from free-form status text.
+
+![GSD Control Tower showing recorded workflow artifacts, plan counts, and verification for an expanded phase](./assets/readme/phase-details.png)
+
 ## Check every project
 
 Choose **All projects** to see one alphabetical list of GSD workstreams across the projects in Muxy. Search by project, worktree, branch, phase, recorded status, verification result, next action, or agent, and open any row for its project details.
 
 Control Tower does not rank projects or manufacture an attention state. Muxy agent activity, GSD verification, reported status, next action, and parser errors remain separate recorded fields.
-
-![GSD Control Tower showing an alphabetical list of workstreams](./assets/readme/all-projects.png)
 
 ## Install
 
